@@ -5,7 +5,8 @@ import {
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
-   useChainId 
+  useChainId,
+  useSwitchChain
 } from "wagmi";
 import { metaMask } from "wagmi/connectors";
 import { useState, useEffect, useMemo } from "react";
@@ -26,6 +27,7 @@ export default function Home() {
   const { address, isConnected } = useAccount();
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [activeView, setActiveView] = useState('home');
@@ -41,12 +43,18 @@ export default function Home() {
         <div className="bg-white p-8 rounded-lg shadow-md text-center">
           <h2 className="text-xl font-bold mb-4">请切换到正确的网络</h2>
           <p className="text-gray-600 mb-4">
-            当前网络不支持，请切换到 Sepolia 测试网或本地 Hardhat 网络
+            当前网络不支持，请切换到 Sepolia 测试网
           </p>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 mb-6">
             <p>Sepolia 链ID: 11155111</p>
             <p>Hardhat 链ID: 31337</p>
           </div>
+          <button
+            onClick={() => switchChain({ chainId: 11155111 })}
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600"
+          >
+            一键切换到 Sepolia 测试网
+          </button>
         </div>
       </div>
     );
@@ -290,7 +298,7 @@ const handlePublish = async () => {
               </div>
             ) : (
               <button
-                onClick={() => connect({ connector: metaMask() })}
+                onClick={() => connect({ connector: metaMask(), chainId: 11155111 })}
                 className="bg-blue-500 text-white px-4 py-2 rounded"
               >
                 连接钱包
@@ -374,7 +382,7 @@ const handlePublish = async () => {
             <h2 className="text-2xl font-bold mb-4">欢迎来到去中心化博客</h2>
             <p className="text-gray-600 mb-8">连接钱包开始发布和阅读文章</p>
             <button
-              onClick={() => connect({ connector: metaMask() })}
+              onClick={() => connect({ connector: metaMask(), chainId: 11155111 })}
               className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600"
             >
               连接 MetaMask 钱包
