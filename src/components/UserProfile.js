@@ -5,7 +5,7 @@ import {
   useAccount,
 } from 'wagmi'
 import { useState, useEffect, useMemo } from 'react'  // 添加 useMemo
-import BlogArtifact from '../../artifacts/contracts/Blog.sol/DecentralizedBlog.json'
+import BlogArtifact from '../abis/DecentralizedBlog.json'
 import { CONTRACT_CONFIG } from '@/lib/wagmi'
 import PostItem from './PostItem'
 import { useQueries } from '@tanstack/react-query'

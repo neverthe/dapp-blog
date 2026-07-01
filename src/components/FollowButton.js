@@ -1,6 +1,6 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi'
 import { useState, useEffect } from 'react'
-import BlogArtifact from '../../artifacts/contracts/Blog.sol/DecentralizedBlog.json'
+import BlogArtifact from '../abis/DecentralizedBlog.json'
 import { CONTRACT_CONFIG } from '@/lib/wagmi'
 
 /**

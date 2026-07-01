@@ -1,7 +1,7 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi'
 import { CONTRACT_CONFIG } from '@/lib/wagmi'
 import { useState, useEffect } from 'react'
-import BlogArtifact from '../../artifacts/contracts/Blog.sol/DecentralizedBlog.json'
+import BlogArtifact from '../abis/DecentralizedBlog.json'
 import FollowButton from './FollowButton'
 import { useRouter } from 'next/router'
 import { useIPFSContent } from '@/hooks/useIPFSContent'

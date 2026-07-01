@@ -11,7 +11,7 @@ import {
 import { metaMask } from "wagmi/connectors";
 import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from '@tanstack/react-query'
-import BlogArtifact from "../../artifacts/contracts/Blog.sol/DecentralizedBlog.json";
+import BlogArtifact from "../abis/DecentralizedBlog.json";
 import { usePostSearch } from '@/hooks/usePostSearch'
 import { CONTRACT_CONFIG } from '@/lib/wagmi'
 import { PostItem, CommentSection, UserProfile, Pagination } from "@/components/index";

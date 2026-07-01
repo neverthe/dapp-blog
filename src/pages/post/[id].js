@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router'
 import { useReadContract, useAccount } from 'wagmi'
 import { useState, useEffect } from 'react'
-import BlogArtifact from '../../../artifacts/contracts/Blog.sol/DecentralizedBlog.json'
+import BlogArtifact from '../../abis/DecentralizedBlog.json'
 import { CONTRACT_CONFIG } from '@/lib/wagmi'
 import CommentSection from '@/components/CommentSection'
 import FollowButton from '@/components/FollowButton'
