@@ -192,9 +192,10 @@ export default function PostDetail() {
                   <div className="text-gray-500">正在从IPFS加载内容...</div>
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap text-gray-800 leading-7 text-lg">
-                  {ipfsContent}
-                </div>
+                <div 
+                  className="post-content text-gray-800 leading-7 text-lg"
+                  dangerouslySetInnerHTML={{ __html: ipfsContent || '暂无内容' }}
+                />
               )}
             </div>
             

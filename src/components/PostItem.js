@@ -3,9 +3,16 @@ import { CONTRACT_CONFIG } from '@/lib/wagmi'
 import { useState, useEffect } from 'react'
 import BlogArtifact from '../abis/DecentralizedBlog.json'
 import FollowButton from './FollowButton'
+import RichTextEditor from './RichTextEditor'
 import { useRouter } from 'next/router'
 import { useIPFSContent } from '@/hooks/useIPFSContent'
-import { uploadToPinata } from '../../utils/pinata' // 添加这行导入
+import { uploadToPinata } from '../../utils/pinata'
+
+// 去除 HTML 标签，用于纯文本预览
+const stripHtml = (html) => {
+  if (!html) return ''
+  return html.replace(/<[^>]*>/g, '').trim()
+}
 
 export default function PostItem({ postId, onUpdate, showActions = true }) {
   const { address } = useAccount()
@@ -198,13 +205,10 @@ const handleSaveEdit = async () => {
             placeholder="文章标题"
             disabled={isEditingTx}
           />
-          <textarea
+          <RichTextEditor
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            rows={6}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            onChange={setEditContent}
             placeholder="文章内容"
-            disabled={isEditingTx}
           />
           <div className="flex gap-3">
             <button
@@ -265,11 +269,16 @@ const handleSaveEdit = async () => {
   onClick={handleViewDetail}
   className="mt-3 text-gray-700 cursor-pointer"
 >
-  <div className="line-clamp-3 leading-relaxed">
+  <div className="line-clamp-3">
     {isLoadingContent ? (
       <div className="text-gray-400">加载内容中...</div>
+    ) : ipfsContent ? (
+      <div className="post-content text-base leading-relaxed">
+        {stripHtml(ipfsContent).substring(0, 200)}
+        {stripHtml(ipfsContent).length > 200 ? '...' : ''}
+      </div>
     ) : (
-      ipfsContent || '暂无内容'
+      <span>暂无内容</span>
     )}
   </div>
   <div className="mt-2 text-blue-500 text-sm font-medium hover:text-blue-600 transition-colors duration-200">
