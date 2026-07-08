@@ -259,6 +259,7 @@ const handlePublish = async () => {
       abi: BlogArtifact.abi,
       functionName: "createPost",
       args: [title, contentHash, tags], // contentHash 现在是IPFS CID
+      gas: 500000n, // 显式设置gas上限，避免RPC估算过高导致"gas limit too high"错误
     });
     
   } catch (error) {

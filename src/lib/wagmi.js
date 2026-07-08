@@ -8,12 +8,13 @@ export const CONTRACT_CONFIG = {
   chainId: process.env.NEXT_PUBLIC_NETWORK === 'sepolia' ? 11155111 : 31337,
 }
 
-// Sepolia RPC 备选列表（国内可用）
+// Sepolia RPC 备选列表（公共 RPC 优先，Infura 放最后防限流）
 const sepoliaRpcUrls = [
-  process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,  // 你配置的（如 Infura 私钥节点）
-  'https://rpc.sepolia.org',                // 公共 RPC
-  'https://ethereum-sepolia.publicnode.com', // PublicNode
-  'https://1rpc.io/sepolia',                // 1RPC
+  'https://ethereum-sepolia.publicnode.com', // PublicNode - 支持 CORS
+  'https://1rpc.io/sepolia',                // 1RPC - 支持 CORS
+  'https://rpc.sepolia.ethpandaops.io',     // EthPandaOps - 支持 CORS
+  'https://endpoints.omniatech.io/1/ethereum/sepolia/public', // Omniatech - 支持 CORS
+  process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,  // Infura 放最后，防限流
 ].filter(Boolean)
 
 export const config = createConfig({
