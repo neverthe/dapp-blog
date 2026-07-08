@@ -1,5 +1,5 @@
 // lib/wagmi.js
-import { createConfig, http } from 'wagmi'
+import { createConfig, http, fallback } from 'wagmi'
 import { sepolia, hardhat } from 'wagmi/chains'
 import { metaMask } from 'wagmi/connectors'
 
@@ -7,6 +7,14 @@ export const CONTRACT_CONFIG = {
   address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xxxx',
   chainId: process.env.NEXT_PUBLIC_NETWORK === 'sepolia' ? 11155111 : 31337,
 }
+
+// Sepolia RPC 备选列表（国内可用）
+const sepoliaRpcUrls = [
+  process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,  // 你配置的（如 Infura 私钥节点）
+  'https://rpc.sepolia.org',                // 公共 RPC
+  'https://ethereum-sepolia.publicnode.com', // PublicNode
+  'https://1rpc.io/sepolia',                // 1RPC
+].filter(Boolean)
 
 export const config = createConfig({
   chains: [sepolia, hardhat],
@@ -16,13 +24,16 @@ export const config = createConfig({
         name: '去中心化博客',
         url: 'http://localhost:3000',
       },
-      // 禁用分析数据上报
       enableAnalytics: false,
     }),
   ],
   transports: {
     [hardhat.id]: http("http://127.0.0.1:8545"),
-    [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL),
+    [sepolia.id]: fallback(sepoliaRpcUrls.map(url => http(url))),
+  },
+  // 禁用批量请求，减少 fetch 失败的连锁影响
+  batch: {
+    multicall: false,
   },
 })
 

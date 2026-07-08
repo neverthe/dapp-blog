@@ -13,8 +13,9 @@ contract DecentralizedBlog is Ownable {
         address author; //作者地址，用来前端展示+后续权限扩展。
         string title; //链上标题，前端直接读，不用 IPFS。
         string contentHash; //正文+图片真正的 CID（IPFS 的 Qm... / bafy...），存在链上但内容在分布式网络。
-        uint256 timestamp; //出块时间，用来排序/显示“多久前发布”。
-        bool published; //软删除标志，后期可扩展“下架”功能，当前代码里一旦创建就 =true。
+        uint256 timestamp; //出块时间，用来排序/显示"多久前发布"。
+        bool published; //软删除标志，后期可扩展"下架"功能，当前代码里一旦创建就 =true。
+        string[] tags; //文章标签/分类，链上存储便于筛选
     }
 
     // 事件：链上日志,// indexed把 id 和 author 加上索引，可以按作者或文章号快速过滤日志
@@ -24,7 +25,8 @@ contract DecentralizedBlog is Ownable {
         address indexed author,
         string title,
         string contentHash,
-        uint256 timestamp
+        uint256 timestamp,
+        string[] tags
     );
 
     // 状态变量
@@ -35,6 +37,13 @@ contract DecentralizedBlog is Ownable {
     //动态数组，仅保存已发布文章的 id，前端想拉列表直接读它即可，不用遍历整个映射。
     uint256[] private _publishedPostIds;
 
+    // 标签系统：标签 -> 该标签下的文章ID列表
+    mapping(string => uint256[]) private _postsByTag;
+    // 所有唯一标签列表
+    string[] private _allTags;
+    // 标签是否存在（用于去重）
+    mapping(string => bool) private _tagExists;
+
     //继承自 Ownable 的构造函数，把部署者 msg.sender 设为 owner。
     constructor() Ownable(msg.sender) {}
 
@@ -44,7 +53,8 @@ contract DecentralizedBlog is Ownable {
     //external：只允许从外部调用，比 public 省 gas
     function createPost(
         string memory _title,
-        string memory _contentHash
+        string memory _contentHash,
+        string[] memory _tags
     ) external returns (uint256) {
         //条件不满足就回滚，并返回友好提示
         require(bytes(_title).length > 0, "Title cannot be empty");
@@ -58,22 +68,44 @@ contract DecentralizedBlog is Ownable {
             title: _title,
             contentHash: _contentHash,
             timestamp: block.timestamp, //当前出块时间
-            published: true
+            published: true,
+            tags: _tags
         });
         //根据ID存入映射的文章
         _posts[postId] = newPost;
         //已发布的动态数据
         _publishedPostIds.push(postId);
+
+        // 注册标签
+        _registerTags(postId, _tags);
+
         //触发事件，前端监听即可无刷新加载新文章。
         emit PostCreated(
             postId,
             msg.sender,
             _title,
             _contentHash,
-            block.timestamp
+            block.timestamp,
+            _tags
         );
         //返回 postId，方便前端拿到后立即跳转到详情页。
         return postId;
+    }
+
+    /**
+     * @dev 内部函数：注册标签到映射
+     */
+    function _registerTags(uint256 _postId, string[] memory _tags) internal {
+        for (uint i = 0; i < _tags.length; i++) {
+            string memory tag = _tags[i];
+            if (bytes(tag).length > 0) {
+                if (!_tagExists[tag]) {
+                    _tagExists[tag] = true;
+                    _allTags.push(tag);
+                }
+                _postsByTag[tag].push(_postId);
+            }
+        }
     }
 
     /**
@@ -129,7 +161,8 @@ contract DecentralizedBlog is Ownable {
     event PostUpdated(
         uint256 indexed id,
         string newTitle,
-        string newContentHash
+        string newContentHash,
+        string[] newTags
     );
     //定义文章删除事件
     event PostDeleted(uint256 indexed id);
@@ -137,17 +170,43 @@ contract DecentralizedBlog is Ownable {
     function updatePost(
         uint256 _postId,
         string memory _newTitle,
-        string memory _newContentHash
+        string memory _newContentHash,
+        string[] memory _newTags
     ) external {
         //从存储中获取文章引用（storage 表示直接修改链上数据）
         Post storage post = _posts[_postId];
         require(post.id != 0, "Post does not exist"); // 先检查存在性
         require(post.author == msg.sender, "Not the author"); // 后检查权限
 
+        // 移除旧标签在 _postsByTag 中的关联
+        for (uint i = 0; i < post.tags.length; i++) {
+            string memory oldTag = post.tags[i];
+            uint256[] storage tagPosts = _postsByTag[oldTag];
+            for (uint j = 0; j < tagPosts.length; j++) {
+                if (tagPosts[j] == _postId) {
+                    tagPosts[j] = tagPosts[tagPosts.length - 1];
+                    tagPosts.pop();
+                    break;
+                }
+            }
+        }
+
         post.title = _newTitle;
         post.contentHash = _newContentHash;
+
+        // 清空旧标签并设置新标签
+        while (post.tags.length > 0) {
+            post.tags.pop();
+        }
+        for (uint i = 0; i < _newTags.length; i++) {
+            post.tags.push(_newTags[i]);
+        }
+
+        // 注册新标签
+        _registerTags(_postId, _newTags);
+
         //触发更新事件
-        emit PostUpdated(_postId, _newTitle, _newContentHash);
+        emit PostUpdated(_postId, _newTitle, _newContentHash, _newTags);
     }
 
     function deletePost(uint256 _postId) external {
@@ -156,6 +215,20 @@ contract DecentralizedBlog is Ownable {
         require(post.author == msg.sender, "Not the author"); // 后检查权限
         //将文章标记为未发布（软删除）.数据仍然保留在链上
         post.published = false;
+
+        // 移除标签在 _postsByTag 中的关联
+        for (uint i = 0; i < post.tags.length; i++) {
+            string memory tag = post.tags[i];
+            uint256[] storage tagPosts = _postsByTag[tag];
+            for (uint j = 0; j < tagPosts.length; j++) {
+                if (tagPosts[j] == _postId) {
+                    tagPosts[j] = tagPosts[tagPosts.length - 1];
+                    tagPosts.pop();
+                    break;
+                }
+            }
+        }
+
         // 从已发布ID数组中移除该文章ID
         for (uint i = 0; i < _publishedPostIds.length; i++) {
             if (_publishedPostIds[i] == _postId) {
@@ -424,4 +497,25 @@ contract DecentralizedBlog is Ownable {
 
     // 添加取消关注事件（在事件定义部分添加）
     event UserUnfollowed(address indexed follower, address indexed unfollowed);
+
+    /**
+     * @dev 获取所有标签
+     */
+    function getAllTags() external view returns (string[] memory) {
+        return _allTags;
+    }
+
+    /**
+     * @dev 获取标签数量
+     */
+    function getTagCount() external view returns (uint256) {
+        return _allTags.length;
+    }
+
+    /**
+     * @dev 获取某个标签下的文章ID列表
+     */
+    function getPostsByTag(string memory _tag) external view returns (uint256[] memory) {
+        return _postsByTag[_tag];
+    }
 }

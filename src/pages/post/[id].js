@@ -182,6 +182,17 @@ export default function PostDetail() {
                 </div>
               )}
             </div>
+
+            {/* 标签显示 */}
+            {post.tags && post.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {post.tags.map((tag, idx) => (
+                  <span key={idx} className="text-sm bg-blue-100 text-blue-700 border border-blue-300 px-3 py-1 rounded-full">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 文章正文 */}

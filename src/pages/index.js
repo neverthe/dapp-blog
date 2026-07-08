@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import BlogArtifact from "../abis/DecentralizedBlog.json";
 import { usePostSearch } from '@/hooks/usePostSearch'
 import { CONTRACT_CONFIG } from '@/lib/wagmi'
-import { PostItem, CommentSection, UserProfile, Pagination } from "@/components/index";
+import { PostItem, CommentSection, UserProfile, Pagination, TagInput } from "@/components/index";
 import RichTextEditor from '@/components/RichTextEditor'
 import { uploadToPinata } from '../../utils/pinata';
 
@@ -30,6 +30,8 @@ export default function Home() {
   const { switchChain } = useSwitchChain();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [tags, setTags] = useState([]);
+  const [selectedTag, setSelectedTag] = useState(null);
   const [activeView, setActiveView] = useState('home');
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -84,6 +86,14 @@ export default function Home() {
     }
   });
 
+  // 获取所有标签
+  const { data: allTags, refetch: refetchTags } = useReadContract({
+    address: CONTRACT_CONFIG.address,
+    abi: BlogArtifact.abi,
+    functionName: "getAllTags",
+    queryKey: ['tags', 'all', chainId],
+  });
+
 // 在 Home.js 中修改文章数据处理
 // 处理文章数据
 const posts = useMemo(() => {
@@ -95,7 +105,8 @@ const posts = useMemo(() => {
     title: post.title,
     contentHash: post.contentHash, // 现在这是IPFS CID
     timestamp: Number(post.timestamp),
-    published: post.published
+    published: post.published,
+    tags: post.tags || []
   }))
 }, [postsData])
 
@@ -113,7 +124,14 @@ const posts = useMemo(() => {
 
   // 分页逻辑
   const displayPosts = useMemo(() => {
-    const postsToDisplay = hasSearch ? filteredPosts : posts
+    let postsToDisplay = hasSearch ? filteredPosts : posts
+    
+    // 按标签筛选
+    if (selectedTag) {
+      postsToDisplay = postsToDisplay.filter(post => 
+        (post.tags || []).some(tag => tag.toLowerCase() === selectedTag.toLowerCase())
+      )
+    }
     
     // 按时间倒序排序（最新的在前面）
     const sortedPosts = [...postsToDisplay].sort((a, b) => b.timestamp - a.timestamp)
@@ -123,25 +141,32 @@ const posts = useMemo(() => {
     const endIndex = startIndex + postsPerPage
     
     return sortedPosts.slice(startIndex, endIndex)
-  }, [hasSearch, filteredPosts, posts, currentPage])
+  }, [hasSearch, filteredPosts, posts, currentPage, selectedTag])
 
   // 总页数
   const totalPages = useMemo(() => {
-    const totalPosts = hasSearch ? filteredPosts.length : posts.length
+    let totalPosts = hasSearch ? filteredPosts.length : posts.length
+    if (selectedTag) {
+      totalPosts = (hasSearch ? filteredPosts : posts).filter(post => 
+        (post.tags || []).some(tag => tag.toLowerCase() === selectedTag.toLowerCase())
+      ).length
+    }
     return Math.ceil(totalPosts / postsPerPage)
-  }, [hasSearch, filteredPosts, posts])
+  }, [hasSearch, filteredPosts, posts, selectedTag])
 
-  // 搜索或数据变化时重置到第一页
+  // 搜索、标签或数据变化时重置到第一页
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, posts])
+  }, [searchTerm, posts, selectedTag])
 
   // 发布文章相关逻辑
   const { 
     writeContract, 
     isPending: isPublishing, 
     error: publishError,
-    data: writeData
+    isError: isPublishError,
+    data: writeData,
+    reset: resetPublish
   } = useWriteContract()
 
   const { isLoading: isConfirming, isSuccess: isConfirmed } = 
@@ -167,6 +192,7 @@ const posts = useMemo(() => {
         // 刷新所有相关查询
         queryClient.invalidateQueries({ queryKey: ['posts'] })
         queryClient.invalidateQueries({ queryKey: ['readContract'] })
+        queryClient.invalidateQueries({ queryKey: ['tags'] })
         
          //console.log('✅ 数据刷新完成')
         
@@ -179,9 +205,22 @@ const posts = useMemo(() => {
       
       setTitle('')
       setContent('')
+      setTags([])
       setShowPublishModal(false)
     }
   }, [isConfirmed, queryClient, refetchPosts])
+
+  // 处理发布交易错误
+  useEffect(() => {
+    if (isPublishError) {
+      if (publishError?.message?.includes('rejected') || publishError?.message?.includes('denied') || publishError?.code === 4001) {
+        // 用户取消，不弹窗
+      } else {
+        console.error('发布失败:', publishError?.message)
+      }
+      resetPublish()
+    }
+  }, [isPublishError, publishError, resetPublish])
 
   // 用户资料跳转事件监听
   useEffect(() => {
@@ -219,7 +258,7 @@ const handlePublish = async () => {
       address: CONTRACT_CONFIG.address,
       abi: BlogArtifact.abi,
       functionName: "createPost",
-      args: [title, contentHash], // contentHash 现在是IPFS CID
+      args: [title, contentHash, tags], // contentHash 现在是IPFS CID
     });
     
   } catch (error) {
@@ -347,6 +386,17 @@ const handlePublish = async () => {
             />
           </div>
           
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              标签 <span className="text-gray-400 text-xs">（可选，最多5个）</span>
+            </label>
+            <TagInput
+              tags={tags}
+              onChange={setTags}
+              placeholder="如：区块链、DeFi、NFT..."
+            />
+          </div>
+          
           <div className="flex gap-3 pt-4">
             <button
               onClick={handlePublish}
@@ -413,7 +463,9 @@ const handlePublish = async () => {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                 <h2 className="text-xl font-semibold">所有文章</h2>
                 <div className="text-sm text-gray-500">
-                  {hasSearch ? `${resultCount} 个搜索结果` : `共 ${posts.length} 篇文章`}
+                  {hasSearch || selectedTag
+                    ? `${displayPosts.length} 个结果`
+                    : `共 ${posts.length} 篇文章`}
                 </div>
               </div>
 
@@ -444,7 +496,8 @@ const handlePublish = async () => {
                     { value: 'all', label: '全部' },
                     { value: 'title', label: '标题' },
                     { value: 'author', label: '作者' },
-                    { value: 'content', label: '内容' }
+                    { value: 'content', label: '内容' },
+                    { value: 'tag', label: '标签' }
                   ].map((filter) => (
                     <label key={filter.value} className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -460,6 +513,38 @@ const handlePublish = async () => {
                 </div>
               </div>
             </div>
+
+            {/* 标签筛选栏 */}
+            {allTags && allTags.length > 0 && (
+              <div className="bg-white p-4 rounded-lg shadow mb-6">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-gray-600 whitespace-nowrap font-medium">🏷️ 标签筛选:</span>
+                  <button
+                    onClick={() => setSelectedTag(null)}
+                    className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                      !selectedTag
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    全部
+                  </button>
+                  {allTags.map((tag, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                      className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                        selectedTag === tag
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 文章列表 */}
             {isLoadingPosts ? (
@@ -498,16 +583,28 @@ const handlePublish = async () => {
                   />
                 )}
               </div>
-            ) : hasSearch ? (
-              // 无搜索结果
+            ) : hasSearch || selectedTag ? (
+              // 无搜索/筛选结果
               <div className="text-center py-12 bg-white rounded-lg shadow">
                 <div className="text-gray-500 text-lg mb-2">没有找到匹配的文章</div>
-                <button 
-                  onClick={clearSearch}
-                  className="text-blue-500 hover:text-blue-600 font-medium"
-                >
-                  清空搜索条件
-                </button>
+                <div className="flex gap-3 justify-center">
+                  {hasSearch && (
+                    <button 
+                      onClick={clearSearch}
+                      className="text-blue-500 hover:text-blue-600 font-medium"
+                    >
+                      清空搜索条件
+                    </button>
+                  )}
+                  {selectedTag && (
+                    <button 
+                      onClick={() => setSelectedTag(null)}
+                      className="text-blue-500 hover:text-blue-600 font-medium"
+                    >
+                      清除标签筛选
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               // 无文章状态

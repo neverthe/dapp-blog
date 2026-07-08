@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
  */
 export function usePostSearch(posts = []) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterBy, setFilterBy] = useState('all') // all, title, author, content
+  const [filterBy, setFilterBy] = useState('all') // all, title, author, content, tag
 
   // 搜索过滤逻辑
   const filteredPosts = useMemo(() => {
@@ -16,7 +16,7 @@ export function usePostSearch(posts = []) {
     const lowercasedSearch = searchTerm.toLowerCase()
     
     return posts.filter(post => {
-      const { title, author, contentHash } = post
+      const { title, author, contentHash, tags } = post
       
       switch (filterBy) {
         case 'title':
@@ -28,13 +28,17 @@ export function usePostSearch(posts = []) {
         case 'content':
           // 注意：contentHash 是 IPFS hash，实际使用时可能需要从 IPFS 获取内容
           return contentHash.toLowerCase().includes(lowercasedSearch)
+
+        case 'tag':
+          return (tags || []).some(tag => tag.toLowerCase().includes(lowercasedSearch))
         
         case 'all':
         default:
           return (
             title.toLowerCase().includes(lowercasedSearch) ||
             author.toLowerCase().includes(lowercasedSearch) ||
-            contentHash.toLowerCase().includes(lowercasedSearch)
+            contentHash.toLowerCase().includes(lowercasedSearch) ||
+            (tags || []).some(tag => tag.toLowerCase().includes(lowercasedSearch))
           )
       }
     })

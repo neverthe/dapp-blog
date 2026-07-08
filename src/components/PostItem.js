@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import BlogArtifact from '../abis/DecentralizedBlog.json'
 import FollowButton from './FollowButton'
 import RichTextEditor from './RichTextEditor'
+import TagInput from './TagInput'
 import { useRouter } from 'next/router'
 import { useIPFSContent } from '@/hooks/useIPFSContent'
 import { uploadToPinata } from '../../utils/pinata'
@@ -51,19 +52,19 @@ export default function PostItem({ postId, onUpdate, showActions = true }) {
   })
 
   // 点赞交易
-  const { data: likeHash, writeContract: likePost } = useWriteContract()
+  const { data: likeHash, writeContract: likePost, isError: isLikeError, error: likeError, reset: resetLike } = useWriteContract()
   const { isLoading: isLiking, isSuccess: isLikeSuccess } = useWaitForTransactionReceipt({ 
     hash: likeHash 
   })
 
   // 编辑交易
-  const { data: editHash, writeContract: editPost } = useWriteContract()
+  const { data: editHash, writeContract: editPost, isError: isEditError, error: editError, reset: resetEdit } = useWriteContract()
   const { isLoading: isEditingTx, isSuccess: isEditSuccess } = useWaitForTransactionReceipt({ 
     hash: editHash 
   })
 
   // 删除交易
-  const { data: deleteHash, writeContract: deletePost } = useWriteContract()
+  const { data: deleteHash, writeContract: deletePost, isError: isDeleteError, error: deleteError, reset: resetDelete } = useWriteContract()
   const { isLoading: isDeleting, isSuccess: isDeleteSuccess } = useWaitForTransactionReceipt({ 
     hash: deleteHash 
   })
@@ -93,10 +94,40 @@ export default function PostItem({ postId, onUpdate, showActions = true }) {
       }
     }
   }, [isLikeSuccess, isEditSuccess, isDeleteSuccess, refetchPost, refetchLikeCount, refetchHasLiked, onUpdate])
+
+  // 处理交易错误（如用户取消签名、拒绝交易等）
+  useEffect(() => {
+    if (isEditError) {
+      if (editError?.message?.includes('rejected') || editError?.message?.includes('denied') || editError?.code === 4001) {
+        // 用户主动取消，不弹错误提示，只需恢复按钮状态
+      } else {
+        console.error('编辑交易失败:', editError?.message)
+      }
+      resetEdit()
+    }
+  }, [isEditError, editError, resetEdit])
+
+  useEffect(() => {
+    if (isDeleteError) {
+      if (deleteError?.message?.includes('rejected') || deleteError?.message?.includes('denied') || deleteError?.code === 4001) {
+        // 用户取消
+      } else {
+        console.error('删除交易失败:', deleteError?.message)
+      }
+      resetDelete()
+    }
+  }, [isDeleteError, deleteError, resetDelete])
+
+  useEffect(() => {
+    if (isLikeError) {
+      resetLike()
+    }
+  }, [isLikeError, likeError, resetLike])
 // post?.contentHash,
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
+  const [editTags, setEditTags] = useState([])
 
   const handleLike = async () => {
     if (!address) return
@@ -112,7 +143,8 @@ export default function PostItem({ postId, onUpdate, showActions = true }) {
   const handleEdit = () => {
     if (!post) return
     setEditTitle(post.title || '')
-  setEditContent(ipfsContent || '') // 改为从ipfsContent获取
+    setEditContent(ipfsContent || '') // 改为从ipfsContent获取
+    setEditTags(post.tags ? [...post.tags] : [])
     setIsEditing(true)
   }
 
@@ -124,12 +156,12 @@ const handleSaveEdit = async () => {
     // 1. 上传新内容到IPFS
     const newContentHash = await uploadToPinata(editTitle, editContent);
     
-    // 2. 调用合约更新
+    // 2. 调用合约更新（包含标签）
     editPost({
       address: CONTRACT_CONFIG.address,
       abi: BlogArtifact.abi,
       functionName: 'updatePost',
-      args: [postId, editTitle, newContentHash], // 传递新的CID
+      args: [postId, editTitle, newContentHash, editTags], // 传递新标签
     });
     
   } catch (error) {
@@ -142,6 +174,7 @@ const handleSaveEdit = async () => {
     setIsEditing(false)
     setEditTitle('')
     setEditContent('')
+    setEditTags([])
   }
 
   const handleDelete = async () => {
@@ -210,6 +243,16 @@ const handleSaveEdit = async () => {
             onChange={setEditContent}
             placeholder="文章内容"
           />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              标签
+            </label>
+            <TagInput
+              tags={editTags}
+              onChange={setEditTags}
+              placeholder="如：区块链、DeFi、NFT..."
+            />
+          </div>
           <div className="flex gap-3">
             <button
               onClick={handleSaveEdit}
@@ -252,6 +295,17 @@ const handleSaveEdit = async () => {
                 <span>•</span>
                 <span>{displayTimestamp}</span>
               </div>
+              
+              {/* 标签显示 */}
+              {post.tags && post.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {post.tags.map((tag, idx) => (
+                    <span key={idx} className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             
             {/* 关注按钮 - 只在不是自己的文章时显示 */}
