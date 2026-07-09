@@ -8,13 +8,13 @@ export const CONTRACT_CONFIG = {
   chainId: process.env.NEXT_PUBLIC_NETWORK === 'sepolia' ? 11155111 : 31337,
 }
 
-// Sepolia RPC 备选列表（公共 RPC 优先，Infura 放最后防限流）
+// Sepolia RPC 列表（Infura 优先，公共 RPC 做备选）
 const sepoliaRpcUrls = [
-  'https://ethereum-sepolia.publicnode.com', // PublicNode - 支持 CORS
-  'https://1rpc.io/sepolia',                // 1RPC - 支持 CORS
-  'https://rpc.sepolia.ethpandaops.io',     // EthPandaOps - 支持 CORS
-  'https://endpoints.omniatech.io/1/ethereum/sepolia/public', // Omniatech - 支持 CORS
-  process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,  // Infura 放最后，防限流
+  process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,  // Infura 优先
+  'https://ethereum-sepolia.publicnode.com',
+  'https://1rpc.io/sepolia',
+  'https://rpc.sepolia.ethpandaops.io',
+  'https://endpoints.omniatech.io/1/ethereum/sepolia/public',
 ].filter(Boolean)
 
 export const config = createConfig({
@@ -30,7 +30,11 @@ export const config = createConfig({
   ],
   transports: {
     [hardhat.id]: http("http://127.0.0.1:8545"),
-    [sepolia.id]: fallback(sepoliaRpcUrls.map(url => http(url))),
+    [sepolia.id]: fallback(sepoliaRpcUrls.map(url => http(url, {
+      timeout: 60_000,     // 60秒超时，代理慢也能等
+      retryCount: 2,       // 失败重试2次
+      retryDelay: 1000,    // 重试间隔1秒
+    }))),
   },
   // 禁用批量请求，减少 fetch 失败的连锁影响
   batch: {

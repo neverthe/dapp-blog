@@ -16,7 +16,7 @@ import { usePostSearch } from '@/hooks/usePostSearch'
 import { CONTRACT_CONFIG } from '@/lib/wagmi'
 import { PostItem, CommentSection, UserProfile, Pagination, TagInput } from "@/components/index";
 import RichTextEditor from '@/components/RichTextEditor'
-import { uploadToPinata } from '../../utils/pinata';
+import { uploadToPinata, uploadImageToPinata } from '../../utils/pinata';
 
 
 export default function Home() {
@@ -36,6 +36,8 @@ export default function Home() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [coverImage, setCoverImage] = useState(null);
+  const [coverImagePreview, setCoverImagePreview] = useState('');
   const postsPerPage = 5; // 每页显示5篇文章
 
   // 添加网络提示
@@ -206,6 +208,8 @@ const posts = useMemo(() => {
       setTitle('')
       setContent('')
       setTags([])
+      setCoverImage(null)
+      setCoverImagePreview('')
       setShowPublishModal(false)
     }
   }, [isConfirmed, queryClient, refetchPosts])
@@ -239,27 +243,28 @@ const posts = useMemo(() => {
   }, []);
 
 const handlePublish = async () => {
-     //console.log('发布前的文章数量:', postIds?.length)
   if (!title || !content) {
     alert('请填写标题和内容');
     return;
   }
 
   try {
-    // 1. 显示上传状态
-     //console.log('📤 正在上传到IPFS...');
+    // 1. 如果有封面图，先上传封面图到 IPFS
+    let coverImageCid = '';
+    if (coverImage) {
+      coverImageCid = await uploadImageToPinata(coverImage);
+    }
     
-    // 2. 上传到IPFS
-    const contentHash = await uploadToPinata(title, content);
-     //console.log('✅ 获得IPFS CID:', contentHash);
+    // 2. 上传内容（含封面图 CID）到 IPFS
+    const contentHash = await uploadToPinata(title, content, coverImageCid);
     
     // 3. 调用智能合约，存储标题和CID
     writeContract({
       address: CONTRACT_CONFIG.address,
       abi: BlogArtifact.abi,
       functionName: "createPost",
-      args: [title, contentHash, tags], // contentHash 现在是IPFS CID
-      gas: 500000n, // 显式设置gas上限，避免RPC估算过高导致"gas limit too high"错误
+      args: [title, contentHash, tags],
+      gas: 500000n,
     });
     
   } catch (error) {
@@ -396,6 +401,50 @@ const handlePublish = async () => {
               onChange={setTags}
               placeholder="如：区块链、DeFi、NFT..."
             />
+          </div>
+
+          {/* 封面图上传 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              封面图 <span className="text-gray-400 text-xs">（可选，推荐 16:9 比例）</span>
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-600 transition-colors">
+                <span>选择图片</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setCoverImage(file)
+                      setCoverImagePreview(URL.createObjectURL(file))
+                    }
+                  }}
+                />
+              </label>
+              {coverImagePreview && (
+                <button
+                  onClick={() => {
+                    setCoverImage(null)
+                    setCoverImagePreview('')
+                  }}
+                  className="text-sm text-red-500 hover:text-red-600"
+                >
+                  移除
+                </button>
+              )}
+            </div>
+            {coverImagePreview && (
+              <div className="mt-3 relative rounded-lg overflow-hidden bg-gray-100">
+                <img
+                  src={coverImagePreview}
+                  alt="封面预览"
+                  className="w-full max-h-48 object-cover"
+                />
+              </div>
+            )}
           </div>
           
           <div className="flex gap-3 pt-4">

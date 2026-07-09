@@ -7,7 +7,7 @@ import RichTextEditor from './RichTextEditor'
 import TagInput from './TagInput'
 import { useRouter } from 'next/router'
 import { useIPFSContent } from '@/hooks/useIPFSContent'
-import { uploadToPinata } from '../../utils/pinata'
+import { uploadToPinata, uploadImageToPinata } from '../../utils/pinata'
 
 // 去除 HTML 标签，用于纯文本预览
 const stripHtml = (html) => {
@@ -32,7 +32,7 @@ export default function PostItem({ postId, onUpdate, showActions = true }) {
     functionName: 'getPost',
     args: [postId],
   })
- const { ipfsContent, isLoading: isLoadingContent } = useIPFSContent(post?.contentHash)
+ const { ipfsContent, coverImage, isLoading: isLoadingContent } = useIPFSContent(post?.contentHash)
 
   const { data: likeCount, refetch: refetchLikeCount } = useReadContract({
     address: CONTRACT_CONFIG.address,
@@ -128,6 +128,8 @@ export default function PostItem({ postId, onUpdate, showActions = true }) {
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editTags, setEditTags] = useState([])
+  const [editCoverImage, setEditCoverImage] = useState(null)
+  const [editCoverImagePreview, setEditCoverImagePreview] = useState('')
 
   const handleLike = async () => {
     if (!address) return
@@ -143,25 +145,36 @@ export default function PostItem({ postId, onUpdate, showActions = true }) {
   const handleEdit = () => {
     if (!post) return
     setEditTitle(post.title || '')
-    setEditContent(ipfsContent || '') // 改为从ipfsContent获取
+    setEditContent(ipfsContent || '')
     setEditTags(post.tags ? [...post.tags] : [])
+    setEditCoverImage(null)
+    setEditCoverImagePreview(coverImage ? `https://gateway.pinata.cloud/ipfs/${coverImage}` : '')
     setIsEditing(true)
   }
 
-// 在 PostItem.js 中修改 handleSaveEdit
 const handleSaveEdit = async () => {
   if (!editTitle.trim() || !editContent.trim()) return
   
   try {
-    // 1. 上传新内容到IPFS
-    const newContentHash = await uploadToPinata(editTitle, editContent);
+    // 1. 如果有新的封面图，先上传
+    let coverImageCid = '';
+    if (editCoverImage) {
+      coverImageCid = await uploadImageToPinata(editCoverImage);
+    } else if (editCoverImagePreview) {
+      // 保留原有的封面图，从预览 URL 中提取 CID
+      const match = editCoverImagePreview.match(/\/ipfs\/(.+)$/);
+      coverImageCid = match ? match[1] : '';
+    }
     
-    // 2. 调用合约更新（包含标签）
+    // 2. 上传新内容到IPFS
+    const newContentHash = await uploadToPinata(editTitle, editContent, coverImageCid);
+    
+    // 3. 调用合约更新（包含标签）
     editPost({
       address: CONTRACT_CONFIG.address,
       abi: BlogArtifact.abi,
       functionName: 'updatePost',
-      args: [postId, editTitle, newContentHash, editTags], // 传递新标签
+      args: [postId, editTitle, newContentHash, editTags],
     });
     
   } catch (error) {
@@ -175,6 +188,8 @@ const handleSaveEdit = async () => {
     setEditTitle('')
     setEditContent('')
     setEditTags([])
+    setEditCoverImage(null)
+    setEditCoverImagePreview('')
   }
 
   const handleDelete = async () => {
@@ -253,6 +268,51 @@ const handleSaveEdit = async () => {
               placeholder="如：区块链、DeFi、NFT..."
             />
           </div>
+          {/* 编辑封面图 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              封面图 <span className="text-gray-400 text-xs">（可选）</span>
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-600 transition-colors">
+                <span>选择图片</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setEditCoverImage(file)
+                      setEditCoverImagePreview(URL.createObjectURL(file))
+                    }
+                  }}
+                  disabled={isEditingTx}
+                />
+              </label>
+              {editCoverImagePreview && (
+                <button
+                  onClick={() => {
+                    setEditCoverImage(null)
+                    setEditCoverImagePreview('')
+                  }}
+                  disabled={isEditingTx}
+                  className="text-sm text-red-500 hover:text-red-600"
+                >
+                  移除封面
+                </button>
+              )}
+            </div>
+            {editCoverImagePreview && (
+              <div className="mt-2 relative rounded-lg overflow-hidden bg-gray-100">
+                <img
+                  src={editCoverImagePreview}
+                  alt="封面预览"
+                  className="w-full max-h-36 object-cover"
+                />
+              </div>
+            )}
+          </div>
           <div className="flex gap-3">
             <button
               onClick={handleSaveEdit}
@@ -318,7 +378,26 @@ const handleSaveEdit = async () => {
             )}
           </div>
 
-{/* // 修改显示内容的部分 - */}
+{/* 封面图展示 */}
+{!isLoadingContent && coverImage && (
+  <div 
+    onClick={handleViewDetail}
+    className="mt-3 cursor-pointer rounded-lg overflow-hidden bg-gray-100"
+  >
+    <div className="aspect-video relative">
+      <img
+        src={`https://gateway.pinata.cloud/ipfs/${coverImage}`}
+        alt="文章封面"
+        className="w-full h-full object-contain hover:opacity-90 transition-opacity"
+        onError={(e) => {
+          e.target.style.display = 'none'
+        }}
+      />
+    </div>
+  </div>
+)}
+
+{/* 内容预览 */}
 <div 
   onClick={handleViewDetail}
   className="mt-3 text-gray-700 cursor-pointer"

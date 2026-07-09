@@ -406,6 +406,24 @@ contract DecentralizedBlog is Ownable {
     // 添加粉丝相关映射
     mapping(address => address[]) private _followers; // 记录每个用户的粉丝列表
 
+    // 阅读量统计  _viewCounts[1] = 100;   // 文章 ID 为 1 的文章有 100 次阅读
+    mapping(uint256 => uint256) private _viewCounts;
+
+    /**
+     * @dev 增加文章阅读量，接收一个参数：文章 ID
+     */
+    function incrementViewCount(uint256 _postId) external {
+        require(_posts[_postId].id != 0, "Post does not exist");
+        _viewCounts[_postId]++;
+    }
+
+    /**
+     * @dev 获取文章阅读量
+     */
+    function getViewCount(uint256 _postId) external view returns (uint256) {
+        return _viewCounts[_postId];
+    }
+
     // ... 现有的状态变量和函数保持不变 ...
 
     /**

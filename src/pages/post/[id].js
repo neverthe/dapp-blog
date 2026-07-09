@@ -23,7 +23,7 @@ export default function PostDetail() {
       enabled: !!id,
     }
   })
-  const { ipfsContent, isLoading: isLoadingContent } = useIPFSContent(post?.contentHash)
+  const { ipfsContent, coverImage, isLoading: isLoadingContent } = useIPFSContent(post?.contentHash)
 
 
   // 读取点赞数
@@ -194,6 +194,22 @@ export default function PostDetail() {
               </div>
             )}
           </div>
+
+          {/* 封面图 */}
+          {!isLoadingContent && coverImage && (
+            <div className="w-full bg-gray-100">
+              <div className="max-h-[32rem] flex items-center justify-center">
+                <img
+                  src={`https://gateway.pinata.cloud/ipfs/${coverImage}`}
+                  alt="文章封面"
+                  className="w-full h-full object-contain max-h-[32rem]"
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* 文章正文 */}
           <div className="p-8">
