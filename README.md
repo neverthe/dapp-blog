@@ -57,16 +57,21 @@ ETHERSCAN_API_KEY=你的Etherscan_API_KEY（可选）
 ```
 4. 智能合约命令
 ```bash
-# 编译合约
+# 加新功能后都要先编译合约
 npx hardhat compile
 # 运行测试
-npx hardhat test
+# npx hardhat test
 # 启动本地开发网络
 # npx hardhat node
 # 部署到本地网络
 # npx hardhat run scripts/deploy.js --network localhost
-# 部署到 Sepolia 测试网
+#第一次部署到 Sepolia 测试网，把 .env里的NEXT_PUBLIC_CONTRACT_ADDRESS 改成 代理合约地址
 npx hardhat run scripts/deploy.js --network sepolia
+# 未来加新功能用 upgrade.js ：
+npx hardhat run scripts/upgrade.js --network sepolia
+#如果加了新函数或者改变函数名字，需要更新前端的 ABI 文件
+# 编译后在 artifacts 里已经有了新 ABI
+cp artifacts/contracts/Blog.sol/DecentralizedBlog.json src/abis/DecentralizedBlog.json
 # 验证合约（部署后）
 # npx hardhat verify --network sepolia <合约地址>
 ```

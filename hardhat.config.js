@@ -1,6 +1,6 @@
 // hardhat.config.js
 require("@nomicfoundation/hardhat-toolbox");
-require('dotenv').config();  // 添加这行dotenv 包的作用是从 .env 文件加载环境变量到 process.env 中。
+require('dotenv').config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
