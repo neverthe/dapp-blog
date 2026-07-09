@@ -10,6 +10,7 @@ import {
 } from "wagmi";
 import { metaMask } from "wagmi/connectors";
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { useQueryClient } from '@tanstack/react-query'
 import BlogArtifact from "../abis/DecentralizedBlog.json";
 import { usePostSearch } from '@/hooks/usePostSearch'
@@ -42,6 +43,7 @@ export default function Home() {
   const [coverImagePreview, setCoverImagePreview] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadPhase, setUploadPhase] = useState(''); // 'cover' | 'content' | ''
+  const [networkTimeout, setNetworkTimeout] = useState(false);
   const postsPerPage = 5; // 每页显示5篇文章
 
   // 添加网络提示
@@ -246,6 +248,17 @@ const posts = useMemo(() => {
     };
   }, []);
 
+  // 网络加载超时提示
+  useEffect(() => {
+    if (isLoadingPosts) {
+      setNetworkTimeout(false);
+      const timer = setTimeout(() => setNetworkTimeout(true), 8000);
+      return () => clearTimeout(timer);
+    } else {
+      setNetworkTimeout(false);
+    }
+  }, [isLoadingPosts]);
+
 const handlePublish = async () => {
   if (!title || !content) {
     alert('请填写标题和内容');
@@ -335,6 +348,12 @@ const handlePublish = async () => {
                   >
                     我的资料
                   </button>
+                  <Link
+                    href="/about"
+                    className="px-3 py-2 rounded text-gray-600 hover:text-gray-800"
+                  >
+                    关于
+                  </Link>
                 </div>
               )}
             </div>
@@ -642,6 +661,19 @@ const handlePublish = async () => {
                     <div className="h-4 bg-gray-200 rounded w-1/3"></div>
                   </div>
                 ))}
+                {networkTimeout && (
+                  <div className="text-center py-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-700 text-sm">
+                      ⏳ 连接区块链网络超时，请检查网络状态或刷新重试
+                    </p>
+                    <button
+                      onClick={() => refetchPosts()}
+                      className="mt-2 text-yellow-800 text-sm underline hover:no-underline"
+                    >
+                      手动刷新
+                    </button>
+                  </div>
+                )}
               </div>
             ) : displayPosts && displayPosts.length > 0 ? (
               // 文章列表
