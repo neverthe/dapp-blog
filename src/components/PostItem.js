@@ -130,6 +130,8 @@ export default function PostItem({ postId, onUpdate, showActions = true }) {
   const [editTags, setEditTags] = useState([])
   const [editCoverImage, setEditCoverImage] = useState(null)
   const [editCoverImagePreview, setEditCoverImagePreview] = useState('')
+  const [editUploadProgress, setEditUploadProgress] = useState(0)
+  const [editUploadPhase, setEditUploadPhase] = useState('') // 'cover' | 'content' | ''
 
   const handleLike = async () => {
     if (!address) return
@@ -159,17 +161,26 @@ const handleSaveEdit = async () => {
     // 1. 如果有新的封面图，先上传
     let coverImageCid = '';
     if (editCoverImage) {
-      coverImageCid = await uploadImageToPinata(editCoverImage);
+      setEditUploadPhase('cover');
+      setEditUploadProgress(0);
+      coverImageCid = await uploadImageToPinata(editCoverImage, (pct) => {
+        setEditUploadProgress(pct);
+      });
     } else if (editCoverImagePreview) {
-      // 保留原有的封面图，从预览 URL 中提取 CID
       const match = editCoverImagePreview.match(/\/ipfs\/(.+)$/);
       coverImageCid = match ? match[1] : '';
     }
     
     // 2. 上传新内容到IPFS
-    const newContentHash = await uploadToPinata(editTitle, editContent, coverImageCid);
+    setEditUploadPhase('content');
+    setEditUploadProgress(0);
+    const newContentHash = await uploadToPinata(editTitle, editContent, coverImageCid, (pct) => {
+      setEditUploadProgress(pct);
+    });
     
-    // 3. 调用合约更新（包含标签）
+    // 3. 调用合约更新
+    setEditUploadPhase('');
+    setEditUploadProgress(0);
     editPost({
       address: CONTRACT_CONFIG.address,
       abi: BlogArtifact.abi,
@@ -180,6 +191,8 @@ const handleSaveEdit = async () => {
   } catch (error) {
     console.error('编辑失败:', error);
     alert(`编辑失败: ${error.message}`);
+    setEditUploadPhase('');
+    setEditUploadProgress(0);
   }
 }
 
@@ -308,7 +321,7 @@ const handleSaveEdit = async () => {
                 <img
                   src={editCoverImagePreview}
                   alt="封面预览"
-                  className="w-full max-h-36 object-cover"
+                  className="w-full max-h-36 object-contain bg-gray-50"
                 />
               </div>
             )}
@@ -316,19 +329,29 @@ const handleSaveEdit = async () => {
           <div className="flex gap-3">
             <button
               onClick={handleSaveEdit}
-              disabled={isEditingTx}
+              disabled={isEditingTx || editUploadPhase !== ''}
               className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 transition-colors duration-200 font-medium"
             >
-              {isEditingTx ? '保存中...' : '保存'}
+              {editUploadPhase === 'cover' ? `封面图 ${editUploadProgress}%` : 
+               editUploadPhase === 'content' ? `上传中 ${editUploadProgress}%` :
+               isEditingTx ? '保存中...' : '保存'}
             </button>
             <button
               onClick={handleCancelEdit}
-              disabled={isEditingTx}
+              disabled={isEditingTx || editUploadPhase !== ''}
               className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:bg-gray-400 transition-colors duration-200 font-medium"
             >
               取消
             </button>
           </div>
+          {(editUploadPhase === 'cover' || editUploadPhase === 'content') && (
+            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-blue-500 transition-all duration-300 rounded-full"
+                style={{ width: `${editUploadProgress}%` }}
+              />
+            </div>
+          )}
         </div>
       ) : (
         // 显示模式

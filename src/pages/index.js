@@ -17,6 +17,7 @@ import { CONTRACT_CONFIG } from '@/lib/wagmi'
 import { PostItem, CommentSection, UserProfile, Pagination, TagInput } from "@/components/index";
 import RichTextEditor from '@/components/RichTextEditor'
 import { uploadToPinata, uploadImageToPinata } from '../../utils/pinata';
+import { useDarkMode } from '@/hooks/useDarkMode'
 
 
 export default function Home() {
@@ -28,6 +29,7 @@ export default function Home() {
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain } = useSwitchChain();
+  const { isDark, toggle: toggleDark } = useDarkMode()
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState([]);
@@ -38,6 +40,8 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const [coverImage, setCoverImage] = useState(null);
   const [coverImagePreview, setCoverImagePreview] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState(''); // 'cover' | 'content' | ''
   const postsPerPage = 5; // 每页显示5篇文章
 
   // 添加网络提示
@@ -252,13 +256,23 @@ const handlePublish = async () => {
     // 1. 如果有封面图，先上传封面图到 IPFS
     let coverImageCid = '';
     if (coverImage) {
-      coverImageCid = await uploadImageToPinata(coverImage);
+      setUploadPhase('cover');
+      setUploadProgress(0);
+      coverImageCid = await uploadImageToPinata(coverImage, (pct) => {
+        setUploadProgress(pct);
+      });
     }
     
     // 2. 上传内容（含封面图 CID）到 IPFS
-    const contentHash = await uploadToPinata(title, content, coverImageCid);
+    setUploadPhase('content');
+    setUploadProgress(0);
+    const contentHash = await uploadToPinata(title, content, coverImageCid, (pct) => {
+      setUploadProgress(pct);
+    });
     
     // 3. 调用智能合约，存储标题和CID
+    setUploadPhase('');
+    setUploadProgress(0);
     writeContract({
       address: CONTRACT_CONFIG.address,
       abi: BlogArtifact.abi,
@@ -270,6 +284,8 @@ const handlePublish = async () => {
   } catch (error) {
     console.error('发布失败:', error);
     alert(`发布失败: ${error.message}`);
+    setUploadPhase('');
+    setUploadProgress(0);
   }
 };
 
@@ -334,6 +350,13 @@ const handlePublish = async () => {
                 <span className="text-sm text-gray-600">
                   {address?.slice(0, 6)}...{address?.slice(-4)}
                 </span>
+                <button
+                  onClick={toggleDark}
+                  className="px-3 py-2 rounded text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 transition-colors"
+                  title={isDark ? '切换到亮色模式' : '切换到深色模式'}
+                >
+                  {isDark ? '☀️' : '🌙'}
+                </button>
                 <button
                   onClick={() => disconnect()}
                   className="bg-red-500 text-white px-4 py-2 rounded text-sm"
@@ -441,32 +464,44 @@ const handlePublish = async () => {
                 <img
                   src={coverImagePreview}
                   alt="封面预览"
-                  className="w-full max-h-48 object-cover"
+                  className="w-full max-h-48 object-contain bg-gray-50"
                 />
               </div>
             )}
           </div>
           
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={handlePublish}
-              disabled={isProcessing}
-              className={`flex-1 py-3 rounded-lg font-medium ${
-                isProcessing 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-500 hover:bg-green-600'
-              } text-white transition-colors`}
-            >
-              {isPublishing ? '提交中...' : 
-               isConfirming ? '确认中...' : 
-               '发布到区块链'}
-            </button>
-            <button
-              onClick={() => setShowPublishModal(false)}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              取消
-            </button>
+          <div>
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={handlePublish}
+                disabled={isProcessing || uploadPhase !== ''}
+                className={`flex-1 py-3 rounded-lg font-medium ${
+                  isProcessing || uploadPhase !== ''
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-green-500 hover:bg-green-600'
+                } text-white transition-colors`}
+              >
+                {uploadPhase === 'cover' ? `上传封面图 ${uploadProgress}%` : 
+                 uploadPhase === 'content' ? `上传文章内容 ${uploadProgress}%` :
+                 isPublishing ? '提交中...' : 
+                 isConfirming ? '确认中...' : 
+                 '发布到区块链'}
+              </button>
+              <button
+                onClick={() => setShowPublishModal(false)}
+                className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                取消
+              </button>
+            </div>
+            {(uploadPhase === 'cover' || uploadPhase === 'content') && (
+              <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 transition-all duration-300 rounded-full"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

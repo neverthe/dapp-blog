@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,17 +14,22 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+html.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+.dark body,
+body.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 /* ===== TipTap 富文本编辑器样式 ===== */
@@ -257,4 +264,160 @@ body {
   border: none;
   border-top: 2px solid #e5e7eb;
   margin: 1.5em 0;
+}
+
+/* ===== 深色模式适配 ===== */
+
+/* 编辑器 */
+.dark .ProseMirror {
+  color: #e5e7eb;
+}
+
+.dark .ProseMirror code {
+  background-color: #374151;
+  color: #e5e7eb;
+}
+
+.dark .ProseMirror blockquote {
+  color: #9ca3af;
+  border-left-color: #60a5fa;
+}
+
+.dark .ProseMirror hr {
+  border-top-color: #374151;
+}
+
+.dark .ProseMirror p.is-editor-empty:first-child::before {
+  color: #6b7280;
+}
+
+/* 文章正文 */
+.dark .post-content {
+  color: #d1d5db;
+}
+
+.dark .post-content blockquote {
+  background: #1f2937;
+  color: #9ca3af;
+  border-left-color: #60a5fa;
+}
+
+.dark .post-content code {
+  background-color: #374151;
+  color: #e5e7eb;
+}
+
+/* ===== 通用深色模式面板覆盖 ===== */
+.dark .bg-white {
+  background-color: #1f2937 !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: #111827 !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: #1f2937 !important;
+}
+
+.dark .text-gray-500,
+.dark .text-gray-600,
+.dark .text-gray-700,
+.dark .text-gray-800 {
+  color: #d1d5db !important;
+}
+
+.dark .text-gray-400 {
+  color: #9ca3af !important;
+}
+
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: #374151 !important;
+}
+
+.dark .shadow-sm,
+.dark .shadow-md {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .hover\:bg-gray-50:hover {
+  background-color: #374151 !important;
+}
+
+.dark .hover\:bg-gray-100:hover {
+  background-color: #374151 !important;
+}
+
+.dark .hover\:bg-gray-200:hover {
+  background-color: #4b5563 !important;
+}
+
+.dark input,
+.dark textarea {
+  background-color: #374151 !important;
+  color: #e5e7eb !important;
+  border-color: #4b5563 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+.dark .ProseMirror {
+  background-color: #1f2937;
+}
+
+/* 标签徽章 */
+.dark .bg-blue-50 {
+  background-color: #1e3a5f !important;
+}
+
+.dark .text-blue-600 {
+  color: #93c5fd !important;
+}
+
+.dark .border-blue-200 {
+  border-color: #1e40af !important;
+}
+
+/* 点赞按钮 */
+.dark .bg-red-50 {
+  background-color: #3b1117 !important;
+}
+
+.dark .text-red-600 {
+  color: #fca5a5 !important;
+}
+
+.dark .border-red-200 {
+  border-color: #7f1d1d !important;
+}
+
+/* 关注/编辑/删除按钮 */
+.dark .bg-blue-100 {
+  background-color: #1e3a5f !important;
+}
+
+.dark .text-blue-500 {
+  color: #93c5fd !important;
+}
+
+.dark button.bg-gray-500 {
+  background-color: #4b5563 !important;
+}
+
+/* 富文本工具栏 */
+.dark .ProseMirror .tiptap-toolbar {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+.dark .ProseMirror .tiptap-toolbar button {
+  color: #d1d5db;
+}
+
+.dark .ProseMirror .tiptap-toolbar button:hover {
+  background-color: #4b5563;
 }
