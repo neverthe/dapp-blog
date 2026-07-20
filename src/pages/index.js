@@ -118,6 +118,15 @@ const posts = useMemo(() => {
   }))
 }, [postsData])
 
+// 从已有文章中提取所有实际存在的标签（排除没有文章关联的"孤儿标签"）
+const activeTags = useMemo(() => {
+  const tagSet = new Set()
+  posts.forEach(post => {
+    ;(post.tags || []).forEach(tag => tagSet.add(tag))
+  })
+  return [...tagSet]
+}, [posts])
+
   // 使用搜索 Hook
   const {
     searchTerm,
@@ -619,7 +628,7 @@ const handlePublish = async () => {
             </div>
 
             {/* 标签筛选栏 */}
-            {allTags && allTags.length > 0 && (
+            {activeTags && activeTags.length > 0 && (
               <div className="bg-white p-4 rounded-lg shadow mb-6">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm text-gray-600 whitespace-nowrap font-medium">🏷️ 标签筛选:</span>
@@ -633,7 +642,7 @@ const handlePublish = async () => {
                   >
                     全部
                   </button>
-                  {allTags.map((tag, index) => (
+                  {activeTags.map((tag, index) => (
                     <button
                       key={index}
                       onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
