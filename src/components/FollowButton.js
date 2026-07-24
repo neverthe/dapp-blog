@@ -46,7 +46,7 @@ export default function FollowButton({
     error: unfollowError 
   } = useWriteContract()
 
-  // 监听交易状态
+  // 监听交易状态。分别监听"关注"和"取消关注"两个独立的交易。
   const { isLoading: isConfirming, isSuccess: isFollowSuccess } = useWaitForTransactionReceipt({ 
     hash: followHash 
   })
@@ -89,8 +89,9 @@ export default function FollowButton({
       args: [targetUser],
     })
   }
-
+//isProcessing 判断"是否有操作正在处理"，用于禁用按钮防止重复点击
   const isProcessing = isFollowingTx || isConfirming || isUnfollowingTx || isUnfollowConfirming
+  //isOwnProfile 判断"是否查看自己的资料"用于决定显示"编辑"还是"关注"。
   const isOwnProfile = currentUser && currentUser.toLowerCase() === targetUser.toLowerCase()
 
   // 如果不是自己的资料且已连接钱包，才显示关注按钮

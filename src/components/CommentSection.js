@@ -13,11 +13,9 @@ export default function CommentSection({ postId }) {
     functionName: 'getComments',
     args: [postId],
   })
-
-  // 添加评论
-  //解构赋值。data: comments: 将返回的 data 重命名为 comments，这样更语义化
-  //refetch: refetchComments: 将返回的 refetch 函数重命名为 refetchComments
-  const { data: commentHash, writeContract: addComment } = useWriteContract()
+//语义更清晰,避免命名冲突
+  //解构赋值时的"重命名"   data本身是交易哈希  writeContract发起交易的函数改名为addComment
+  const { data: commentHash, writeContract: addComment, isPending: isWalletPending, isError: isCommentError, error: commentError, reset: resetComment } = useWriteContract()
   //监听交易的确认状态，等待交易被矿工打包进区块。hash: commentHash: 要监听的交易哈希
   const { isLoading: isCommenting, isSuccess: isCommentSuccess } = useWaitForTransactionReceipt({ 
     hash: commentHash 
@@ -25,6 +23,7 @@ export default function CommentSection({ postId }) {
 
 
   const handleSubmitComment = async (e) => {
+    //表单触发 submit 事件会刷新页面。阻止刷新。
     e.preventDefault()
     if (!commentText.trim() || !address) return
 
@@ -68,11 +67,16 @@ useEffect(() => {
           <div className="flex justify-end mt-2">
             <button
               type="submit"
-              disabled={isCommenting || !commentText.trim()}
+              disabled={isWalletPending || isCommenting || !commentText.trim()}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
             >
-              {isCommenting ? '提交中...' : '发表评论'}
+              {isWalletPending ? '钱包确认中...' : isCommenting ? '提交中...' : '发表评论'}
             </button>
+            {isCommentError && (
+              <p className="text-red-500 text-sm mt-1">
+                {commentError?.shortMessage || '评论提交失败'}
+              </p>
+            )}
           </div>
         </form>
       )}

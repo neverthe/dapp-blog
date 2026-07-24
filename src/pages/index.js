@@ -46,7 +46,7 @@ export default function Home() {
   const [networkTimeout, setNetworkTimeout] = useState(false);
   const postsPerPage = 5; // 每页显示5篇文章
 
-  // 添加网络提示
+  // 添加网络提示  支持 Sepolia (11155111) 和 Hardhat (31337)
   if (isConnected && chainId !== 11155111 && chainId !== 31337) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -70,7 +70,9 @@ export default function Home() {
     );
   }
 
-  // 读取文章列表
+  // 读取文章列表id,解构重命名,原本返回的 data 被重命名为 postIds
+  //refetch 是 wagmi 的 useReadContract 返回的一个手动触发函数，用于主动重新执行合约查询并获取最新数据。
+  //1. 用户手动刷新按钮2. 在比如创建文章后刷新数据3.定时轮询更新
   const { 
     data: postIds, 
     refetch: refetchPosts,
@@ -80,15 +82,18 @@ export default function Home() {
     address: CONTRACT_CONFIG.address,
     abi: BlogArtifact.abi,
     functionName: "getAllPostIds",
-    queryKey: ['posts', 'allIds', chainId], // 添加 chainId 到 queryKey
+    queryKey: ['posts', 'allIds', chainId], // 添加 chainId 到 queryKey，不同链的数据独立缓存，相同 queryKey 会复用缓存
   });
 
-  // 获取文章详情（批量）
+  // 获取文章详情（批量）  // 一次传入所有ID 性能好
   const { data: postsData } = useReadContract({
     address: CONTRACT_CONFIG.address,
     abi: BlogArtifact.abi,
     functionName: "getMultiplePosts",
     args: postIds ? [postIds] : [],
+     //query 是 TanStack Query 的配置对象，用于控制查询行为。它是一个条件开关，只有满足条件时才发起请求。
+    //只有当 postIds 存在 并且 postIds 不是空数组时，才执行这个查询
+    //!! 确保值被转换为布尔类型
     query: {
       enabled: !!postIds && postIds.length > 0,
     }
@@ -104,6 +109,8 @@ export default function Home() {
 
 // 在 Home.js 中修改文章数据处理
 // 处理文章数据
+//把 postsData（合约返回的原始数据）转换成前端更容易使用的格式，并缓存结果。
+//postsData 没变 → 直接复用缓存 → 不执行转换
 const posts = useMemo(() => {
   if (!postsData) return []
   
@@ -120,7 +127,10 @@ const posts = useMemo(() => {
 
 // 从已有文章中提取所有实际存在的标签（排除没有文章关联的"孤儿标签"）
 const activeTags = useMemo(() => {
+  //new Set() 创建了一个空的“集合”数据结构，它的特点是：里面的值都是独一无二的（自动去重）。
   const tagSet = new Set()
+  //post.tags || []安全取值
+  // 防御性写法 ; 这个分号防止上一行代码没加分号导致的语法错误
   posts.forEach(post => {
     ;(post.tags || []).forEach(tag => tagSet.add(tag))
   })
@@ -176,16 +186,18 @@ const activeTags = useMemo(() => {
     setCurrentPage(1)
   }, [searchTerm, posts, selectedTag])
 
-  // 发布文章相关逻辑
+  // 获取 writeContract 方法  ，拿到所有工具，然后用工具发起交易，然后监控状态变化
+  // 用 useEffect 盯着某个变量，当它的值发生变化时，自动执行对应的操作（如刷新数据、关闭弹窗、显示错误等）。
+  //Wagmi 提供的"写入合约"Hook.它返回一个 writeContract 函数和一系列状态变量（等待中、错误、交易哈希等），
   const { 
-    writeContract, 
-    isPending: isPublishing, 
-    error: publishError,
-    isError: isPublishError,
-    data: writeData,
-    reset: resetPublish
+    writeContract, // 快递员（发起交易）
+    isPending: isPublishing, // 运送中？
+    error: publishError,// 错误信息
+    isError: isPublishError, // 出错了？
+    data: writeData, // 交易哈希（快递单号）
+    reset: resetPublish// 重置状态
   } = useWriteContract()
-
+//Wagmi 提供的 等待交易确认 的 Hook。
   const { isLoading: isConfirming, isSuccess: isConfirmed } = 
     useWaitForTransactionReceipt({
       hash: writeData,
@@ -206,10 +218,10 @@ const activeTags = useMemo(() => {
          //console.log('刷新结果:', result)
          //console.log('刷新后的文章ID列表:', result.data) // 从 data 属性获取
         
-        // 刷新所有相关查询
-        queryClient.invalidateQueries({ queryKey: ['posts'] })
-        queryClient.invalidateQueries({ queryKey: ['readContract'] })
-        queryClient.invalidateQueries({ queryKey: ['tags'] })
+        // 刷新所有相关查询。布文章后强制刷新列表。布文章后强制刷新列表告诉缓存：这些数据过期了，下次用到时重新请求
+        queryClient.invalidateQueries({ queryKey: ['posts'] })  // 刷新文章列表
+        queryClient.invalidateQueries({ queryKey: ['readContract'] }) // 刷新所有合约数据
+        queryClient.invalidateQueries({ queryKey: ['tags'] })  // 刷新标签列表
         
          //console.log('✅ 数据刷新完成')
         

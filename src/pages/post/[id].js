@@ -14,6 +14,8 @@ export default function PostDetail() {
 
 
   // 读取文章详情
+  //useReadContract 不用 writeContract 那样的工厂模式
+  //因为读操作是自动、同步、无 Gas、无签名的，它属于“状态查询”，不需要用户主动触发。
   const { data: post, error, refetch: refetchPost } = useReadContract({
     address: CONTRACT_CONFIG.address,
     abi: BlogArtifact.abi,
@@ -54,7 +56,7 @@ export default function PostDetail() {
     }
   }, [id])
 
-  // 查看用户资料
+  // 查看用户资料.CustomEvent,跨层级、不频繁的通信.简单、无需额外库
   const handleViewProfile = (authorAddress) => {
     if (authorAddress) {
       window.dispatchEvent(new CustomEvent('viewUserProfile', { detail: authorAddress }))

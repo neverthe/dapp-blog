@@ -8,20 +8,23 @@ import { useState, useEffect, useMemo } from 'react'  // 添加 useMemo
 import BlogArtifact from '../abis/DecentralizedBlog.json'
 import { CONTRACT_CONFIG } from '@/lib/wagmi'
 import PostItem from './PostItem'
-import { useQueries } from '@tanstack/react-query'
 
 
 export default function UserProfile({ userAddress }) {
   const { address: currentUser } = useAccount()
   const [activeTab, setActiveTab] = useState('posts')
 
-  // 1. 获取用户文章数量
+  //getLikedPosts 的遍历发生在合约里     用户文章数量的遍历在前端    主页搜索作者
+  //文章数、点赞数 → ❌ 全量遍历，有性能隐患
+  //后续可以考虑改动，合约层：给每个用户自己的"档案柜",加上文章数、点赞数
+//按用户存 mapping(address => Post[]) userPosts;
+  // 1. 获取 所有文章的 ID 列表
   const { data: allPostIds } = useReadContract({
     address: CONTRACT_CONFIG.address,
     abi: BlogArtifact.abi,
     functionName: 'getAllPostIds',
   })
-
+//所有 所有作者 的 文章内容
   const { data: postsData } = useReadContract({
     address: CONTRACT_CONFIG.address,
     abi: BlogArtifact.abi,
@@ -35,6 +38,7 @@ export default function UserProfile({ userAddress }) {
   // 计算用户文章数量
   const userPostsCount = useMemo(() => {
     if (!postsData) return 0
+    //filter() 遍历所有文章,筛选出作者地址匹配的文章
     return postsData.filter(post => 
       post.author.toLowerCase() === userAddress.toLowerCase()
     ).length

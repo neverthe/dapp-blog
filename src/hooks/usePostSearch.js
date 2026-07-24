@@ -10,9 +10,11 @@ export function usePostSearch(posts = []) {
   const [filterBy, setFilterBy] = useState('all') // all, title, author, content, tag
 
   // 搜索过滤逻辑
+  //useMemo 是 React 内置的一个 性能优化 Hook，用来缓存计算结果，避免在每次渲染时都重新计算。
   const filteredPosts = useMemo(() => {
+      // 搜索词为空 → 返回全部
     if (!searchTerm.trim()) return posts
-
+//把用户输入的搜索词全部转换成小写字母。
     const lowercasedSearch = searchTerm.toLowerCase()
     
     return posts.filter(post => {
